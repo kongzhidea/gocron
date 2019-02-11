@@ -180,6 +180,7 @@ func (j *Job) At(t string) *Job {
 	return j
 }
 
+
 //Compute the instant when this job should run next
 func (j *Job) scheduleNextRun() {
 	if j.lastRun == time.Unix(0, 0) {
@@ -253,6 +254,15 @@ func (j *Job) Minute() (job *Job) {
 //set the unit with minute
 func (j *Job) Minutes() (job *Job) {
 	j.unit = "minutes"
+
+	// add by kongzhihui， for run at 0 second.
+	now := time.Now()
+	interval := int(j.interval)
+	lastRunMin := (now.Minute() / interval) * interval
+	mock := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), lastRunMin, 0, 0, loc)
+	j.lastRun = mock
+	// end add by kongzhihui
+
 	return j
 }
 
