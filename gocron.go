@@ -40,7 +40,6 @@ func ChangeLoc(newLocation *time.Location) {
 const MAXJOBNUM = 10000
 
 type Job struct {
-
 	// pause interval * unit bettween runs
 	interval uint64
 
@@ -180,7 +179,6 @@ func (j *Job) At(t string) *Job {
 	return j
 }
 
-
 //Compute the instant when this job should run next
 func (j *Job) scheduleNextRun() {
 	if j.lastRun == time.Unix(0, 0) {
@@ -195,6 +193,8 @@ func (j *Job) scheduleNextRun() {
 			j.lastRun = time.Now()
 		}
 	}
+	// add by kongzhihui, fix runtime at 0 ms.
+	j.lastRun = time.Unix(j.lastRun.Unix(), 0)
 
 	if j.period != 0 {
 		// translate all the units to the Seconds
@@ -218,6 +218,9 @@ func (j *Job) scheduleNextRun() {
 		}
 		j.nextRun = j.lastRun.Add(j.period * time.Second)
 	}
+
+	// add by kongzhihui, fix runtime at 0 ms.
+	j.nextRun = time.Unix(j.nextRun.Unix(), 0)
 }
 
 // NextScheduledTime returns the time of when this job is to run next
@@ -239,7 +242,24 @@ func (j *Job) Second() (job *Job) {
 // Set the unit with seconds
 func (j *Job) Seconds() (job *Job) {
 	j.unit = "seconds"
+
+	initJobLastRun(j, time.Second)
+
 	return j
+}
+
+// duration 执行间隔，单位：秒
+func initJobLastRun(j *Job, durationUnit time.Duration) {
+	// add by kongzhihui， for run at 0 second.
+	mock := time.Date(2019, 1, 1, 0, 0, 0, 0, loc)
+
+	durationSecond := int64(j.interval) * int64(durationUnit) / int64(time.Second)
+	delta := time.Now().Unix() - mock.Unix()
+
+	lastRunUnix := (delta / durationSecond) * durationSecond
+
+	j.lastRun = time.Unix(mock.Unix()+lastRunUnix, 0)
+	// end add by kongzhihui
 }
 
 // Set the unit  with minute, which interval is 1
@@ -255,13 +275,7 @@ func (j *Job) Minute() (job *Job) {
 func (j *Job) Minutes() (job *Job) {
 	j.unit = "minutes"
 
-	// add by kongzhihui， for run at 0 second.
-	now := time.Now()
-	interval := int(j.interval)
-	lastRunMin := (now.Minute() / interval) * interval
-	mock := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), lastRunMin, 0, 0, loc)
-	j.lastRun = mock
-	// end add by kongzhihui
+	initJobLastRun(j, time.Minute)
 
 	return j
 }
@@ -278,6 +292,9 @@ func (j *Job) Hour() (job *Job) {
 // Set the unit with hours
 func (j *Job) Hours() (job *Job) {
 	j.unit = "hours"
+
+	initJobLastRun(j, time.Hour)
+
 	return j
 }
 
@@ -293,6 +310,9 @@ func (j *Job) Day() (job *Job) {
 // Set the job's unit with days
 func (j *Job) Days() *Job {
 	j.unit = "days"
+
+	initJobLastRun(j, 24*time.Hour)
+
 	return j
 }
 
@@ -370,6 +390,9 @@ func (j *Job) Sunday() (job *Job) {
 //Set the units as weeks
 func (j *Job) Weeks() *Job {
 	j.unit = "weeks"
+
+	initJobLastRun(j, 7*24*time.Hour)
+
 	return j
 }
 
@@ -490,7 +513,7 @@ func (s *Scheduler) Clear() {
 // Add seconds ticker
 func (s *Scheduler) Start() chan bool {
 	stopped := make(chan bool, 1)
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(100 * time.Microsecond)
 
 	go func() {
 		for {

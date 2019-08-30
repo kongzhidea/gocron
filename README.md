@@ -16,6 +16,8 @@ See also this two great articles:
 
 Back to this package, you could just use this simple API as below, to run a cron scheduler.
 
+fix run time on 0ms by kk.
+
 ```go
 package main
 
